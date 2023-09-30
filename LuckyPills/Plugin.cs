@@ -6,29 +6,29 @@
     
     public class Plugin : Plugin<Config>
     {
-        public override string Author { get; } = "Nut Inc";
+        public override string Author { get; } = "RAPLX";
         public override string Name { get; } = "Lucky Pills";
-        public override Version Version { get; } = new Version(3, 2, 0);
-        public override Version RequiredExiledVersion { get; } = new Version(5, 0, 0, 0);
+        public override Version Version { get; } = new Version(1, 1, 0);
+        public override Version RequiredExiledVersion { get; } = new Version(8, 0, 0);
 
-        private EventHandlers _eventHandler;
+        private EventHandlers eventHandler;
 
         public override void OnEnabled()
         {
-            _eventHandler = new EventHandlers(this);
+            eventHandler = new EventHandlers(this);
 
-            PlayerEvent.UsingItem += _eventHandler.OnEatThePill;
-            PlayerEvent.PickingUpItem += _eventHandler.OnPickupPill;
+            PlayerEvent.UsedItem += eventHandler.UsedItem;
+            PlayerEvent.PickingUpItem += eventHandler.OnPickup;
             
             base.OnEnabled();
         }
 
         public override void OnDisabled()
         {
-            PlayerEvent.UsingItem -= _eventHandler.OnEatThePill;
-            PlayerEvent.PickingUpItem -= _eventHandler.OnPickupPill;
-            
-            _eventHandler = null;
+            PlayerEvent.UsedItem -= eventHandler.UsedItem;
+            PlayerEvent.PickingUpItem -= eventHandler.OnPickup;
+
+            eventHandler = null;
             
             base.OnDisabled();
         }

@@ -6,6 +6,10 @@ using Exiled.API.Features.Items;
 using Exiled.Events.EventArgs;
 using MEC;
 using CustomPlayerEffects;
+using Exiled.Events.EventArgs.Player;
+using PlayerRoles;
+using System.Linq;
+using Exiled.API.Features.Roles;
 
 namespace LuckyPills
 {
@@ -20,10 +24,21 @@ namespace LuckyPills
             this.config = plugin.Config;
         }
 
-        private static void SpawnGrenadeOnPlayer(Player player, GrenadeType grenadeType, float timer, float velocity = 1f)
+        private static void SpawnGrenadeOnPlayer(Player player, ProjectileType grenadeType)
         {
-            bool fullForce = velocity >= 1;
-            player.ThrowGrenade(grenadeType, fullForce);
+            switch (grenadeType)
+            {
+                case ProjectileType.Scp018:
+                    Throwable throwable = Item.Create(ItemType.SCP018, player) as Throwable;
+
+                    throwable.Throw(true);
+                    
+                    break;
+                default:
+                    player.ThrowGrenade(grenadeType, true);
+                    
+                    break;
+            }
         }
 
         private IEnumerator<float> GrenadeVomitTime(Player player, float randomTimer)
@@ -31,7 +46,7 @@ namespace LuckyPills
             for (var i = 0; i < randomTimer * 10.0 && player.IsAlive; ++i)
             {
                 yield return Timing.WaitForSeconds(plugin.Config.GrenadeVomitInterval);
-                SpawnGrenadeOnPlayer(player, GrenadeType.FragGrenade, 5f);
+                SpawnGrenadeOnPlayer(player, ProjectileType.FragGrenade);
             }
         }
 
@@ -41,7 +56,7 @@ namespace LuckyPills
             {
                 yield return Timing.WaitForSeconds(plugin.Config.FlashVomitInterval);
                 player.Hurt(1);
-                SpawnGrenadeOnPlayer(player, GrenadeType.Flashbang, 5f);
+                SpawnGrenadeOnPlayer(player, ProjectileType.Flashbang);
             }
         }
 
@@ -51,11 +66,11 @@ namespace LuckyPills
             {
                 yield return Timing.WaitForSeconds(plugin.Config.BallVomitInterval);
                 player.Hurt(1);
-                SpawnGrenadeOnPlayer(player, GrenadeType.Scp018, 5f);
+                SpawnGrenadeOnPlayer(player, ProjectileType.Scp018);
             }
         }
 
-        public void OnPickupPill(PickingUpItemEventArgs ev)
+        public void OnPickup(PickingUpItemEventArgs ev)
         {
             if (ev.Pickup.Type == ItemType.Painkillers)
             {
@@ -63,34 +78,30 @@ namespace LuckyPills
             }
         }
 
-        public void OnEatThePill(UsingItemEventArgs ev)
+        public void UsedItem(UsedItemEventArgs ev)
         {
-            Timing.RunCoroutine(RunPillCoroutine(ev));
+            if (ev.Item.Type == ItemType.Painkillers)
+            {
+                Timing.RunCoroutine(RunPillCoroutine(ev));
+            }
         }
 
-        private IEnumerator<float> RunPillCoroutine(UsingItemEventArgs ev)
+        private IEnumerator<float> RunPillCoroutine(UsedItemEventArgs ev)
         {
-            yield return Timing.WaitForSeconds(3f);
+            yield return Timing.WaitForSeconds(0.1f);
             
             Item item = ev.Item;
             Player player = ev.Player;
 
-            if (item.Base.ItemTypeId == ItemType.Painkillers || player.IsInPocketDimension) yield break;
-
-            string effectType = this.NextEffect();
+            string effectType = NextEffect();
             float duration = Mathf.Ceil(Random.Range(config.MinDuration, config.MaxDuration));
+
+            Log.Debug($"Player: {player.UserId}, Effect: {effectType}, Duration: {duration}");
 
             player.RemoveItem(item);
 
-            player.EnableEffect(effectType, duration, true);
-
             switch(effectType)
             {
-                case "amnesia":
-                    player.EnableEffect<Amnesia>(duration);
-                    player.ShowHint($"You've been given amnesia for {duration} seconds");
-
-                    break;
                 case "bleeding":
                     player.EnableEffect<Bleeding>(duration);
                     player.ShowHint($"You've been given bleeding for {duration} seconds");
@@ -107,7 +118,7 @@ namespace LuckyPills
 
                     break;
                 case "corroding":
-                    player.EnableEffect<Corroding>(duration);
+                    player.EnableEffect<PocketCorroding>(duration);
                     player.ShowHint("You've been sent to the pocket dimension");
 
                     break;
@@ -117,19 +128,15 @@ namespace LuckyPills
 
                     break;
                 case "explode":
-                    ExplosiveGrenade explosiveGrenade = (ExplosiveGrenade)Item.Create(ItemType.GrenadeHE);
-
+                    ExplosiveGrenade explosiveGrenade = Item.Create(ItemType.GrenadeHE) as ExplosiveGrenade;       
                     explosiveGrenade.FuseTime = .5f;
                     explosiveGrenade.SpawnActive(ev.Player.Position);
-
-                    if (player.IsAlive)
-                        player.Kill(DamageType.Explosion);
 
                     player.ShowHint("You've been exploded");
 
                     break;
                 case "flashed":
-                    FlashGrenade flashGrenade = (FlashGrenade)Item.Create(ItemType.GrenadeFlash);
+                    FlashGrenade flashGrenade = Item.Create(ItemType.GrenadeFlash) as FlashGrenade;
                     flashGrenade.FuseTime = .5f;
                     flashGrenade.SpawnActive(ev.Player.Position);
 
@@ -153,44 +160,126 @@ namespace LuckyPills
 
                     break;
                 case "mutate":
-                    Exiled.API.Features.Roles.Role cachedMutatorRole = player.Role;
+                    Role cachedMutatorRole = player.Role;
 
                     player.DropItems();
-                    player.SetRole(RoleType.Scp0492, SpawnReason.ForceClass, true);
+                    player.Role.Set(RoleTypeId.Scp0492, SpawnReason.ForceClass);
 
-                    Timing.CallDelayed(duration, () => player.SetRole(cachedMutatorRole, SpawnReason.ForceClass, true));
+                    Vector3 cachedPos = player.Position;
+
+                    Timing.CallDelayed(duration, () => 
+                    {
+                        Log.Info(cachedMutatorRole.Type);
+
+                        player.Role.Set(player.Role, SpawnReason.ForceClass);
+
+                        player.Position = cachedPos;
+                    });
 
                     player.ShowHint($"You've been mutated for {duration} seconds");
 
                     break;
                 case "paper":
-                    player.Scale = new Vector3(1f, 1f, 0.01f);
-                    Timing.CallDelayed(duration, () => player.Scale = new Vector3(1f, 1f, 1f));
+                    player.Scale = new(1f, 1f, 0.01f);
+                    Timing.CallDelayed(duration, () => player.Scale = new(1f, 1f, 1f));
                     player.ShowHint($"You've been turned into paper for {duration} seconds");
 
                     break;
                 case "sinkhole":
-                    player.EnableEffect<SinkHole>(duration);
+                    player.EnableEffect<Sinkhole>(duration);
                     player.ShowHint($"You've been given sinkhole effect for {duration} seconds");
 
                     break;
                 case "scp268":
-                    player.IsInvisible = true;
-                    Timing.CallDelayed(duration, () => player.IsInvisible = false);
+                    player.EnableEffect<Invisible>(duration);
 
                     player.ShowHint($"You've been turned invisible for {duration} seconds");
 
                     break;
                 case "upsidedown":
-                    player.Scale = new Vector3(1f, -1f, 1f);
+                    player.Scale = new(1f, -1f, 1f);
                     Timing.CallDelayed(duration, () =>
                     {
-                        player.Scale = new Vector3(1f, 1f, 1f);
+                        player.Scale = new(1f, 1f, 1f);
                         player.Position += new Vector3(0, 1, 0);
                     });
 
                     player.ShowHint($"You've been converted to Australian for {duration} seconds");
 
+                    break;
+                case "sizedown":
+                    player.Scale = new(0.5f, 0.5f, 0.5f);
+                    Timing.CallDelayed(duration, () => player.Scale = new(1f, 1f, 1f));
+
+                    player.ShowHint($"You've been cut in half for {duration} seconds");
+                    
+                    break;
+                case "tpscp":
+                    if (Player.Get(Side.Scp).Any())
+                    {
+                        Player scpPlayer = Player.Get(Side.Scp).ToList().RandomItem();
+                        player.Position = scpPlayer.Position;
+                        player.ShowHint($"You've been teleported to an SCP.");
+                    }
+                    else
+                    {
+                        player.ShowHint("No SCP found to teleport to.");
+                    }
+                    break;
+                case "sonic":
+                    player.EnableEffect<MovementBoost>(duration);
+                    player.ChangeEffectIntensity<MovementBoost>(config.MovementBoostIntensity, duration);
+
+                    player.ShowHint($"You've been made in to Sonic for {duration} seconds");
+                    break;
+                case "basketballplayer":
+                    player.Scale = new Vector3(1.5f, 1.5f, 1.5f);
+
+                    Timing.CallDelayed(duration, () => player.Scale = new Vector3(1f, 1f, 1f));
+
+                    player.ShowHint($"You've been converted to a basketball player for {duration} seconds");
+
+                    break;
+                case "deafened":
+                    player.EnableEffect<Deafened>(duration);
+
+                    player.ShowHint($"You've been Deafened for {duration} seconds");
+                    break;
+                case "blinded":
+                    player.EnableEffect<Blinded>(duration);
+
+                    player.ShowHint($"You've been Blinded for {duration} seconds");
+                    break;
+                case "rndtp":
+                    Room rand = Room.List.ElementAt(Random.Range(0, Room.List.Count()));
+                    player.Position = rand.Position + Vector3.up;
+
+                    player.ShowHint("You've been teleported to a random room.");
+                    break;
+                case "tptoply":
+                    {
+                        List<Player> players = Player.List.Where(p => p.IsScp == false && p != player).ToList();
+                        if (players.Count() == 0)
+                        {
+                            player.ShowHint("No Player found to teleport.");
+                        }
+                        else
+                        {
+                            Player ply = players.ElementAt(Random.Range(0, players.Count()));
+                            player.Position = ply.Position + Vector3.up;
+                            player.ShowHint($"You've been teleported to {ply.Nickname}");
+                        }
+                        break;
+                    }
+                case "dropitems":
+                    player.DropItems();
+
+                    player.ShowHint("It looks like you dropped something.");
+                    break;
+                case "tantrum":
+                    player.PlaceTantrum();
+
+                    player.ShowHint($"It looks like you didn't get to the toilet in time.");
                     break;
                 default:
                     player.ShowHint($"You've been {effectType} for {duration} seconds");

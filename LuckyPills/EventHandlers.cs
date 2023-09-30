@@ -55,7 +55,7 @@ namespace LuckyPills
             for (var i = 0; i < randomTimer * 10.0 && player.IsAlive; ++i)
             {
                 yield return Timing.WaitForSeconds(plugin.Config.FlashVomitInterval);
-                player.Hurt(1);
+                player.Hurt(config.DamageOnThrow);
                 SpawnGrenadeOnPlayer(player, ProjectileType.Flashbang);
             }
         }
@@ -65,7 +65,7 @@ namespace LuckyPills
             for (var i = 0; i < randomTimer * 10.0 && player.IsAlive; ++i)
             {
                 yield return Timing.WaitForSeconds(plugin.Config.BallVomitInterval);
-                player.Hurt(1);
+                player.Hurt(config.DamageOnThrow);
                 SpawnGrenadeOnPlayer(player, ProjectileType.Scp018);
             }
         }

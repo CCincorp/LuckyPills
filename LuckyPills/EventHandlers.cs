@@ -3,14 +3,15 @@ using UnityEngine;
 using Exiled.API.Enums;
 using Exiled.API.Features;
 using Exiled.API.Features.Items;
-using Exiled.Events.EventArgs;
 using MEC;
 using CustomPlayerEffects;
 using Exiled.Events.EventArgs.Player;
 using PlayerRoles;
 using System.Linq;
 using Exiled.API.Features.Roles;
-using System;
+using Exiled.API.Extensions;
+using Exiled.API.Features.Toys;
+using InventorySystem.Items.Usables.Scp330;
 
 namespace LuckyPills
 {
@@ -19,6 +20,8 @@ namespace LuckyPills
         private readonly Plugin plugin;
         private readonly Config config;
         private readonly Translation translation;
+
+        private System.Random rnd = new System.Random();
 
         public EventHandlers(Plugin plugin)
         {
@@ -35,11 +38,11 @@ namespace LuckyPills
                     Throwable throwable = Item.Create(ItemType.SCP018, player) as Throwable;
 
                     throwable.Throw(true);
-                    
+
                     break;
                 default:
                     player.ThrowGrenade(grenadeType, true);
-                    
+
                     break;
             }
         }
@@ -65,176 +68,146 @@ namespace LuckyPills
 
         public void UsedItem(UsedItemEventArgs ev)
         {
-            if (ev.Item.Type == ItemType.Painkillers)
+            if (ev.Item.Type != ItemType.Painkillers) return;
+
+            string goodorbad = "good";
+
+            if (rnd.Next(1,101) <= config.ChanceForBadEffect)
             {
-                Timing.RunCoroutine(RunPillCoroutine(ev));
+                goodorbad = "bad";
             }
+
+            Timing.RunCoroutine(RunPillCoroutine(ev, goodorbad));
         }
 
-        private IEnumerator<float> RunPillCoroutine(UsedItemEventArgs ev)
+        private IEnumerator<float> RunPillCoroutine(UsedItemEventArgs ev, string badorgood)
         {
             Item item = ev.Item;
             Player player = ev.Player;
 
-            if (player.IsInPocketDimension) yield break;
-
-            string effectType = NextEffect();
+            string effectType = NextEffect(badorgood);
             float duration = Mathf.Ceil(UnityEngine.Random.Range(config.MinDuration, config.MaxDuration));
 
             translation.EffectHints.TryGetValue(effectType, out string value);
 
-            Log.Debug($"Player: {player.UserId}, Effect: {effectType}, Duration: {duration}");
+            if (!config.AllowInPocketDimension && ev.Player.IsInPocketDimension) yield break;
+
+            Log.Debug($"Player: {player.UserId} | {player.Nickname}, Effect: {effectType}");
 
             player.RemoveItem(item);
 
-            switch(effectType)
+            switch (effectType)
             {
-                case "bleeding":
-                    player.EnableEffect<Bleeding>(duration);
-                    
-                    value = String.Format(value, duration);
-
-                    break;
                 case "bombvomit":
-                    Timing.RunCoroutine(Vomit(player, ProjectileType.FragGrenade, duration));
-                    value = String.Format(value, duration);
-
+                    {
+                        Timing.RunCoroutine(Vomit(player, ProjectileType.FragGrenade, duration));
+                        value = string.Format(value, duration);
+                    }
                     break;
                 case "ballvomit":
-                    Timing.RunCoroutine(Vomit(player, ProjectileType.Scp018, duration));
-                    value = String.Format(value, duration);
-
+                    {
+                        Timing.RunCoroutine(Vomit(player, ProjectileType.Scp018, duration));
+                        value = string.Format(value, duration);
+                    }
                     break;
-                case "corroding":
-                    player.EnableEffect<PocketCorroding>(duration);
-                    value = String.Format(value, duration);
-
-                    break;
-                case "decontaminating":
-                    player.EnableEffect<Decontaminating>(duration);
-                    value = String.Format(value, duration);
-
-                    break;
-                case "explode":
-                    ExplosiveGrenade explosiveGrenade = Item.Create(ItemType.GrenadeHE) as ExplosiveGrenade;       
-                    explosiveGrenade.FuseTime = .5f;
-                    explosiveGrenade.SpawnActive(ev.Player.Position);
-
+                case "grenade":
+                    {
+                        ExplosiveGrenade explosiveGrenade = Item.Create(ItemType.GrenadeHE) as ExplosiveGrenade;
+                        explosiveGrenade.FuseTime = 2f;
+                        explosiveGrenade.SpawnActive(ev.Player.Position);
+                    }
                     break;
                 case "flashed":
-                    FlashGrenade flashGrenade = Item.Create(ItemType.GrenadeFlash) as FlashGrenade;
-                    flashGrenade.FuseTime = .5f;
-                    flashGrenade.SpawnActive(ev.Player.Position);
-
+                    {
+                        FlashGrenade flashGrenade = Item.Create(ItemType.GrenadeFlash) as FlashGrenade;
+                        flashGrenade.FuseTime = .5f;
+                        flashGrenade.SpawnActive(ev.Player.Position);
+                    }
                     break;
                 case "flashvomit":
-                    Timing.RunCoroutine(Vomit(player, ProjectileType.Flashbang, duration));
-                    value = String.Format(value, duration);
-
+                    {
+                        Timing.RunCoroutine(Vomit(player, ProjectileType.Flashbang, duration));
+                        value = string.Format(value, duration);
+                    }
                     break;
                 case "god":
-                    player.IsGodModeEnabled = true;
-                    Timing.CallDelayed(duration, () => player.IsGodModeEnabled = false);
-                    value = String.Format(value, duration);
-
-                    break;
-                case "hemorrhage":
-                    player.EnableEffect<Hemorrhage>(duration);
-                    value = String.Format(value, duration);
-
+                    {
+                        player.IsGodModeEnabled = true;
+                        Timing.CallDelayed(duration, () => player.IsGodModeEnabled = false);
+                        value = string.Format(value, duration);
+                    }
                     break;
                 case "mutate":
-                    Role cachedMutatorRole = player.Role;
-
-                    player.DropItems();
-                    player.Role.Set(RoleTypeId.Scp0492, SpawnReason.ForceClass);
-
-                    Vector3 cachedPos = player.Position;
-
-                    Timing.CallDelayed(duration, () => 
                     {
-                        player.Role.Set(cachedMutatorRole, SpawnReason.ForceClass);
+                        Role cachedMutatorRole = player.Role;
 
-                        player.Position = cachedPos;
-                    });
+                        player.DropItems();
+                        player.Role.Set(RoleTypeId.Scp0492, SpawnReason.ForceClass);
 
-                    value = String.Format(value, duration);
+                        Vector3 cachedPos = player.Position;
 
+                        Timing.CallDelayed(duration, () =>
+                        {
+                            player.Role.Set(cachedMutatorRole, SpawnReason.ForceClass);
+
+                            player.Position = cachedPos;
+                        });
+
+                        value = string.Format(value, duration);
+                    }
                     break;
                 case "paper":
-                    player.Scale = new(1f, 1f, 0.01f);
-                    Timing.CallDelayed(duration, () => player.Scale = new(1f, 1f, 1f));
-                    value = String.Format(value, duration);
-
-                    break;
-                case "sinkhole":
-                    player.EnableEffect<Sinkhole>(duration);
-                    value = String.Format(value, duration);
-
-                    break;
-                case "scp268":
-                    player.EnableEffect<Invisible>(duration);
-
-                    value = String.Format(value, duration);
-
-                    break;
-                case "upsidedown":
-                    player.Scale = new(1f, -1f, 1f);
-                    Timing.CallDelayed(duration, () =>
                     {
-                        player.Scale = new(1f, 1f, 1f);
-                        player.Position += new Vector3(0, 1, 0);
-                    });
-
-                    value = String.Format(value, duration);
-
+                        player.Scale = new(1f, 1f, 0.01f);
+                        Timing.CallDelayed(duration, () => player.Scale = new(1f, 1f, 1f));
+                        value = string.Format(value, duration);
+                    }
                     break;
                 case "sizedown":
-                    player.Scale = new(0.5f, 0.5f, 0.5f);
-                    Timing.CallDelayed(duration, () => player.Scale = new(1f, 1f, 1f));
+                    {
+                        player.Scale = new(0.5f, 0.5f, 0.5f);
+                        Timing.CallDelayed(duration, () => player.Scale = new(1f, 1f, 1f));
+                        value = string.Format(value, duration);
+                    }
 
-                    value = String.Format(value, duration);
-                    
                     break;
                 case "tpscp":
-                    if (Player.Get(Side.Scp).Any())
                     {
-                        Player scpPlayer = Player.Get(Side.Scp).ToList().RandomItem();
-                        player.Position = scpPlayer.Position;
-                    }
-                    else
-                    {
-                        translation.EffectHints.TryGetValue("tpscpfailed", out value);
+                        if (Player.Get(Side.Scp).Any())
+                        {
+                            Player scpPlayer = Player.Get(Side.Scp).ToList().RandomItem();
+                            player.Position = scpPlayer.Position;
+
+                            value = string.Format(value, scpPlayer.Role.Name);
+                        }
+                        else
+                        {
+                            translation.EffectHints.TryGetValue("tpscpfailed", out value);
+                        }
                     }
                     break;
                 case "sonic":
-                    player.EnableEffect<MovementBoost>(duration);
-                    player.ChangeEffectIntensity<MovementBoost>(config.MovementBoostIntensity, duration);
+                    {
+                        player.EnableEffect<MovementBoost>(duration);
+                        player.ChangeEffectIntensity<MovementBoost>(config.MovementBoostIntensity, duration);
 
-                    value = String.Format(value, duration);
+                        value = string.Format(value, duration);
+                    }
                     break;
                 case "basketballplayer":
-                    player.Scale = new Vector3(1.5f, 1.5f, 1.5f);
+                    {
+                        player.Scale = new Vector3(1.5f, 1.5f, 1.5f);
 
-                    Timing.CallDelayed(duration, () => player.Scale = new Vector3(1f, 1f, 1f));
+                        Timing.CallDelayed(duration, () => player.Scale = new Vector3(1f, 1f, 1f));
 
-                    value = String.Format(value, duration);
-
-                    break;
-                case "deafened":
-                    player.EnableEffect<Deafened>(duration);
-
-                    value = String.Format(value, duration);
-                    break;
-                case "blinded":
-                    player.EnableEffect<Blinded>(duration);
-
-                    value = String.Format(value, duration);
+                        value = string.Format(value, duration);
+                    }
                     break;
                 case "rndtp":
-                    Room rand = Room.List.ElementAt(UnityEngine.Random.Range(0, Room.List.Count()));
-                    player.Position = rand.Position + Vector3.up;
-
+                    {
+                        Room rand = Room.List.ElementAt(UnityEngine.Random.Range(0, Room.List.Count()));
+                        player.Position = rand.Position + Vector3.up;
+                    }
                     break;
                 case "tptoply":
                     {
@@ -247,25 +220,126 @@ namespace LuckyPills
                         {
                             Player ply = players.ElementAt(UnityEngine.Random.Range(0, players.Count()));
                             player.Position = ply.Position + Vector3.up;
-                            value = String.Format(value, ply.Nickname);
+                            value = string.Format(value, ply.Nickname);
                         }
                         break;
                     }
                 case "dropitems":
-                    player.DropItems();
-
+                    {
+                        player.DropItems();
+                    }
                     break;
                 case "tantrum":
-                    player.PlaceTantrum();
+                    {
+                        player.PlaceTantrum();
+                    }
+                    break;
+                case "badeffect":
+                    {
+                        EffectType effect = config.BadEffectTypes.GetRandomValue();
 
+                        player.EnableEffect(effect, duration);
+
+                        value = string.Format(value, effect, duration);
+                    }
+                    break;
+                case "goodeffect":
+                    {
+                        EffectType effect = config.GoodEffectTypes.GetRandomValue();
+
+                        player.EnableEffect(effect, duration);
+
+                        value = string.Format(value, effect, duration);
+                    }
+                    break;
+                case "increasehealth":
+                    {
+                        player.Health *= config.IncreaseHealh;
+                    }
+                    break;
+                case "grandma":
+                    {
+                        Scp244 scp224 = Item.Create(ItemType.SCP244a) as Scp244;
+
+                        scp224.Primed = true;
+
+                        scp224.CreatePickup(player.Position);
+                    }
+                    break;
+                case "randomitem":
+                    {
+                        ItemType itemType = config.RandomItemList.GetRandomValue();
+
+                        player.AddItem(itemType);
+
+                        value = string.Format(value, itemType);
+                    }
+                    break;
+                case "randomteam":
+                    {
+                        player.DropItems();
+
+                        RoleTypeId roleType = config.PossableRoles.GetRandomValue();
+
+                        player.Role.Set(roleType, SpawnReason.ForceClass);
+
+                        value = string.Format(value, roleType.GetFullName());
+                    }
+                    break;
+                case "flipnukeswitch":
+                    {
+                        if (Warhead.LeverStatus == true)
+                        {
+                            Warhead.LeverStatus = false;
+                            translation.EffectHints.TryGetValue("flipnukeswitchOFF", out value);
+                            break;
+                        }
+
+                        Warhead.LeverStatus = true;
+                        translation.EffectHints.TryGetValue("flipnukeswitchON", out value);
+                    }
+                    break;
+                case "bypass":
+                    player.IsBypassModeEnabled = true;
+                    Timing.CallDelayed(duration, () => player.IsBypassModeEnabled = false);
+
+                    value = string.Format(value, duration);
+                    break;
+                case "ap":
+                    {
+                        player.AddAhp(100, limit: 100, decay: 0);
+                    }
+                    break;
+                case "primitive":
+                    {
+                        Primitive.Create(player.Position, scale: Vector3.one);
+                    }
+                    break;
+                case "pinkcandy":
+                    {
+                        Scp330 scp330 = Item.Create(ItemType.SCP330) as Scp330;
+
+                        scp330.AddCandy(CandyKindID.Pink);
+
+                        scp330.CreatePickup(player.Position);
+                    }
                     break;
                 default:
-                    player.ShowHint($"Unknown Effect: {effectType}");
+                    translation.EffectHints.TryGetValue("UnknownEffect", out value);
+
+                    value = string.Format(value, effectType);
                     break;
             }
             player.ShowHint(value);
         }
 
-        private string NextEffect() => plugin.Config.PossibleEffects[UnityEngine.Random.Range(0, config.PossibleEffects.Count)];
+        private string NextEffect(string goodorbad)
+        {
+            if (goodorbad == "bad") 
+            {
+                return plugin.Config.BadEffects[UnityEngine.Random.Range(0, config.BadEffects.Count)];
+            }
+            return plugin.Config.GoodEffects[UnityEngine.Random.Range(0, config.GoodEffects.Count)];
+        }
     }
 }

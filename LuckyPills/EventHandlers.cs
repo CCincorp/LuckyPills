@@ -18,11 +18,13 @@ namespace LuckyPills
     {
         private readonly Plugin plugin;
         private readonly Config config;
+        private readonly Translation translation;
 
         public EventHandlers(Plugin plugin)
         {
             this.plugin = plugin;
             this.config = plugin.Config;
+            this.translation = plugin.Translation;
         }
 
         private static void SpawnGrenadeOnPlayer(Player player, ProjectileType grenadeType)
@@ -79,7 +81,7 @@ namespace LuckyPills
             string effectType = NextEffect();
             float duration = Mathf.Ceil(UnityEngine.Random.Range(config.MinDuration, config.MaxDuration));
 
-            config.EffectHints.TryGetValue(effectType, out string value);
+            translation.EffectHints.TryGetValue(effectType, out string value);
 
             Log.Debug($"Player: {player.UserId}, Effect: {effectType}, Duration: {duration}");
 
@@ -202,7 +204,7 @@ namespace LuckyPills
                     }
                     else
                     {
-                        config.EffectHints.TryGetValue("tpscpfailed", out value);
+                        translation.EffectHints.TryGetValue("tpscpfailed", out value);
                     }
                     break;
                 case "sonic":
@@ -239,7 +241,7 @@ namespace LuckyPills
                         List<Player> players = Player.List.Where(p => p.IsScp == false && p.IsAlive == true && p != player).ToList();
                         if (players.Count() == 0)
                         {
-                            config.EffectHints.TryGetValue("tptoplyfailed", out value);
+                            translation.EffectHints.TryGetValue("tptoplyfailed", out value);
                         }
                         else
                         {

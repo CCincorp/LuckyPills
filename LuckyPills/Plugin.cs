@@ -4,7 +4,7 @@
     using Exiled.API.Features;
     using PlayerEvent = Exiled.Events.Handlers.Player;
     
-    public class Plugin : Plugin<Config>
+    public class Plugin : Plugin<Config, Translation>
     {
         public override string Author { get; } = "RAPLX";
         public override string Name { get; } = "Lucky Pills";

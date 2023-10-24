@@ -25,6 +25,7 @@ namespace LuckyPills
             {"sonic",  "You are Sonic for {0} seconds"},
             {"basketballplayer",  "Lebron James for {0} seconds"},
             {"rndtp",  "You've been teleported to a random room."},
+            {"rndtpwarhead", "Warhead was Detonated."},
             {"tptoplyfailed",  "No Player found to teleport."},
             {"tptoply",  "You've been teleported to {0}"},
             {"dropitems",  "Your pockets have holes"},

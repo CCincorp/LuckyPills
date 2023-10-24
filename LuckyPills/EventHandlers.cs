@@ -92,7 +92,7 @@ namespace LuckyPills
 
             if (!config.AllowInPocketDimension && ev.Player.IsInPocketDimension) yield break;
 
-            Log.Debug($"Player: {player.UserId} | {player.Nickname}, Effect: {effectType}");
+            Log.Debug($"Player: {player.UserId} | {player.Nickname} | {player.Id}, Effect: {effectType}");
 
             player.RemoveItem(item);
 
@@ -205,8 +205,22 @@ namespace LuckyPills
                     break;
                 case "rndtp":
                     {
-                        Room rand = Room.List.ElementAt(UnityEngine.Random.Range(0, Room.List.Count()));
-                        player.Position = rand.Position + Vector3.up;
+                        if (Warhead.IsDetonated)
+                        {
+                            translation.EffectHints.TryGetValue("rndtpwarhead", out value);
+                            break;
+                        }
+
+                        Room room = Room.List.ElementAt(UnityEngine.Random.Range(0, Room.List.Count()));
+
+                        if (Map.IsLczDecontaminated)
+                        {
+                            var rooms = Room.List.Where(r => r.Zone != ZoneType.LightContainment);
+
+                            room = rooms.ElementAt(UnityEngine.Random.Range(0, rooms.Count()));
+                        }
+
+                        player.Position = room.Position + Vector3.up;
                     }
                     break;
                 case "tptoply":

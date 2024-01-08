@@ -68,6 +68,7 @@
         public HashSet<EffectType> GoodEffectTypes { get; set; } = new()
         {
             EffectType.BodyshotReduction,
+            Effecttype.AntiScp207,
             EffectType.DamageReduction,
             EffectType.Invigorated,
             EffectType.Invisible,
@@ -145,6 +146,8 @@
             "grenade",
             "mutate",
             "paper",
+            "bombvomit",
+            "bombvomit",
             "bombvomit",
             "flashvomit",
             "sizedown",

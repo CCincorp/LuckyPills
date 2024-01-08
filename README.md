@@ -1,3 +1,3 @@
 # LuckyPills
 
-Originally by ReddKing and then reworked by Parkeymon and now by me.
+Originally by ReddKing and then reworked by Parkeymon, RAPLX and now by me.

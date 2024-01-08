@@ -6,7 +6,7 @@
     
     public class Plugin : Plugin<Config, Translation>
     {
-        public override string Author { get; } = "RAPLX";
+        public override string Author { get; } = "Drcctv";
         public override string Name { get; } = "Lucky Pills";
         public override Version Version { get; } = new Version(1, 1, 1);
         public override Version RequiredExiledVersion { get; } = new Version(8, 0, 0);

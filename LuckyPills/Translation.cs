@@ -10,7 +10,7 @@ namespace LuckyPills
         [Description("Set a different hint message. NOTE: {0} will be replaced with the seconds or player's name depending on the effect")]
         public Dictionary<string, string> EffectHints { get; set; } = new()
         {
-            {"bombvomit",  "You started vomiting Grenades for {0} seconds"},
+            {"bombvomit",  "You started vomiting Grenades for {0} seconds, Have fun!"},
             {"ballvomit",  "You started vomiting Balls for {0} seconds"},
             {"grenade",  "Run, Grenade"},
             {"flashed",  "Watch out Flashbang"},
